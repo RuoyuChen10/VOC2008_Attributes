@@ -8,7 +8,7 @@ Created on 2021/07/14
 
 import yaml
 
-class Config():
+class Config(object):
     """
     Contain the hyber parameters
     """
