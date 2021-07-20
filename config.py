@@ -18,12 +18,18 @@ class Config(object):
         self.BACKBONE = dict["BACKBONE"]
         self.PRETRAINED = dict["PRETRAINED"]
 
+        self.STRATEGY = dict["STRATEGY"]
+
         self.BATCH_SIZE = dict["BATCH_SIZE"]
         self.OPTIMIZER = dict["OPTIMIZER"]
         self.LEARNING_RATE = dict["LEARNING_RATE"]
 
         self.EPOCH = dict["EPOCH"]
 
+        self.LOSS_FUNCTION = dict["LOSS_FUNCTION"]
+        if self.LOSS_FUNCTION == "BCELoss":
+            self.POS_LOSS_WEIGHT = dict["POS_LOSS_WEIGHT"]
+            self.ATTR_LOSS_WEIGHT = dict["ATTR_LOSS_WEIGHT"]
         # self.GPU_DEVICE = dict["GPU_DEVICE"]
 
         self.DATASET_ROOT = dict["DATASET_ROOT"]

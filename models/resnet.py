@@ -1,6 +1,8 @@
 import torch.nn as nn
 import math
 
+from torch.nn.modules.activation import Sigmoid
+
 __all__ = ['ResNet', 'resnet50']
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -80,9 +82,11 @@ class Bottleneck(nn.Module):
 
 class ResNet(nn.Module):
  
-    def __init__(self, block, layers, num_classes, attribute_classes):
+    def __init__(self, block, layers, num_classes, attribute_classes, strategy="A"):
         self.inplanes = 64
         super(ResNet, self).__init__()
+        self.strategy = strategy
+
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1 = nn.BatchNorm2d(64)
@@ -94,14 +98,22 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
         self.avgpool = nn.AvgPool2d(7, stride=1)
         
-        self.layers = self._make_multi_output(block,num_classes,attribute_classes)
+        if self.strategy == "A":
+            self.layers = self._make_multi_output(block,num_classes,attribute_classes)
+        elif self.strategy == "B":
+            self.layers = nn.Sequential(
+                nn.Linear(512*block.expansion, 1024),
+                nn.ReLU(True),
+                nn.Linear(1024, attribute_classes)
+                # nn.Sigmoid()
+            )
  
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
+        # for m in self.modules():
+        #     if isinstance(m, nn.Conv2d):
+        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+        #     elif isinstance(m, nn.BatchNorm2d):
+        #         nn.init.constant_(m.weight, 0.0001)
+        #         nn.init.constant_(m.bias, 0)
  
     def _make_layer(self, block, planes, blocks, stride=1):
         downsample = None
@@ -144,24 +156,28 @@ class ResNet(nn.Module):
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         
-        outs = []
-        for layer in self.layers:
-            outs.append(layer(x))
+        if self.strategy == "A":
+            outs = []
+            for layer in self.layers:
+                outs.append(layer(x))
+        
+        elif self.strategy == "B":
+            outs = self.layers(x)
  
         return outs
 
-def ResNet18(num_classes, attribute_classes):
-    return ResNet(BasicBlock, [2,2,2,2], num_classes, attribute_classes)
+def ResNet18(num_classes, attribute_classes, strategy):
+    return ResNet(BasicBlock, [2,2,2,2], num_classes, attribute_classes, strategy)
 
-def ResNet34(num_classes, attribute_classes):
-    return ResNet(BasicBlock, [3,4,6,3], num_classes, attribute_classes)
+def ResNet34(num_classes, attribute_classes, strategy):
+    return ResNet(BasicBlock, [3,4,6,3], num_classes, attribute_classes, strategy)
 
-def ResNet50(num_classes, attribute_classes):
-    return ResNet(Bottleneck, [3,4,6,3], num_classes, attribute_classes)
+def ResNet50(num_classes, attribute_classes, strategy):
+    return ResNet(Bottleneck, [3,4,6,3], num_classes, attribute_classes, strategy)
 
-def ResNet101(num_classes, attribute_classes):
-    return ResNet(Bottleneck, [3,4,23,3], num_classes, attribute_classes)
+def ResNet101(num_classes, attribute_classes, strategy):
+    return ResNet(Bottleneck, [3,4,23,3], num_classes, attribute_classes, strategy)
 
-def ResNet152(num_classes, attribute_classes):
-    return ResNet(Bottleneck, [3,8,36,3], num_classes, attribute_classes)
+def ResNet152(num_classes, attribute_classes, strategy):
+    return ResNet(Bottleneck, [3,8,36,3], num_classes, attribute_classes, strategy)
 

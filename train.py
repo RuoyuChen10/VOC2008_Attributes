@@ -13,12 +13,9 @@ import time
 
 import torch
 import torch.nn as nn 
-import torch.nn.functional as F 
 import torch.optim as optim
-from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import StepLR
-from torchvision import models
 
 from config import Config
 from Logging import Logger
@@ -36,11 +33,13 @@ def mkdir(name):
         os.makedirs(name)
     return 0
 
-def define_backbone(network_name, num_classes, attribute_classes, pretrained=None):
-    if network_name == "ResNet101":
-        model = ResNet101(num_classes, attribute_classes)
+def define_backbone(network_name, num_classes, attribute_classes, strategy, pretrained=None):
+    if network_name == "ResNet50":
+        model = ResNet50(num_classes, attribute_classes, strategy)
+    elif network_name == "ResNet101":
+        model = ResNet101(num_classes, attribute_classes, strategy)
 
-    if pretrained:      # Load pretrained model
+    if os.path.exists(pretrained):      # Load pretrained model
         model_dict = model.state_dict()
         pretrained_param = torch.load(pretrained)
         pretrained_dict = {k: v for k, v in pretrained_param.items() if k in model_dict}
@@ -58,6 +57,13 @@ def define_backbone(network_name, num_classes, attribute_classes, pretrained=Non
                      "\033[0mas backbone.")
     return model
 
+def define_Loss_function(loss_name, weight=None, pos_loss_weight=None):
+    if loss_name == "Multi":
+        Loss_function = MultiClassLoss()
+    elif loss_name == "BCELoss":
+        Loss_function = nn.BCEWithLogitsLoss(weight=weight,pos_weight=pos_loss_weight)
+    return Loss_function
+
 def define_optimizer(model, optimizer_name, learning_rate):
     if optimizer_name == "SGD":
         optimizer = optim.SGD(model.parameters(), lr = learning_rate, weight_decay = 0.01)
@@ -70,6 +76,7 @@ def main(args):
     device = torch.device("cuda")
 
     # Configuration file
+    global cfg
     cfg = Config(args.configuration_file)
 
     # model save path
@@ -82,13 +89,10 @@ def main(args):
     logger = Logger(os.path.join(model_save_path,"logging.log"))
 
     # Dataloader
-    train_dataset = Dataset(dataset_root=cfg.DATASET_ROOT,dataset_list=cfg.DATASET_LIST_TRAIN,class_name=cfg.CLASS_NAME)
+    train_dataset = Dataset(dataset_root=cfg.DATASET_ROOT,dataset_list=cfg.DATASET_LIST_TRAIN,class_name=cfg.CLASS_NAME, strategy=cfg.STRATEGY, data_type="train")
     train_loader = DataLoader(train_dataset,batch_size=cfg.BATCH_SIZE,shuffle=True)
 
-    # validation_dataset = Dataset(dataset_root=cfg.DATASET_ROOT,dataset_list=cfg.DATASET_LIST_TEST,class_name=cfg.CLASS_NAME)
-    # validation_loader = DataLoader(validation_dataset,batch_size=cfg.BATCH_SIZE,shuffle=True)
-
-    model = define_backbone(cfg.BACKBONE, cfg.CLASS_NUM, cfg.ATTRIBUTE_NUM, cfg.PRETRAINED)
+    model = define_backbone(cfg.BACKBONE, cfg.CLASS_NUM, cfg.ATTRIBUTE_NUM, cfg.STRATEGY ,cfg.PRETRAINED)
 
     # GPU
     if torch.cuda.is_available():
@@ -98,25 +102,26 @@ def main(args):
         model = nn.DataParallel(model)
 
     # Loss
-    Loss_function = MultiClassLoss()
+    # weight = torch.Tensor([cfg.ATTR_LOSS_WEIGHT for i in range(cfg.BATCH_SIZE)]).to(device)
+    weight = torch.Tensor(cfg.ATTR_LOSS_WEIGHT).to(device)
+    Loss_function = define_Loss_function(cfg.LOSS_FUNCTION, weight, torch.Tensor(cfg.POS_LOSS_WEIGHT).to(device))
 
     # optimizer
     optimizer = define_optimizer(model, cfg.OPTIMIZER, cfg.LEARNING_RATE)
 
-    scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
+    # scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
 
     for i in range(1,cfg.EPOCH+1):
-        scheduler.step()
+        # scheduler.step()
 
         model.train()
         
         for ii, (data,label) in enumerate(train_loader):
             data = data.to(device)
-            label = label.to(device).long()
+            label = label.to(device)
 
             output = model(data)
-
-            loss, _ = Loss_function(output, label)
+            loss = Loss_function(output, label)
 
             optimizer.zero_grad()
             loss.backward()
@@ -141,9 +146,9 @@ def main(args):
 def parse_args():
     parser = argparse.ArgumentParser(description='VOC 2008 datasets, attributes prediction')
     parser.add_argument('--configuration-file', type=str,
-        default='./configs/Base-ResNet101.yaml',
+        default='./configs/Base-ResNet101-B.yaml',
         help='The model configuration file.')
-    parser.add_argument('--gpu-device', type=str, default="0,1,2,3",
+    parser.add_argument('--gpu-device', type=str, default="0,1,2",
                         help='GPU device')
     # parser.add_argument('--LOG_txt', type=str, default="train.log",
     #                     help='log')

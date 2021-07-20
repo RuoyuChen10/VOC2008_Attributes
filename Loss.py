@@ -18,11 +18,11 @@ class MultiClassLoss(nn.Module):
         labels: Torch_size(batch, attributes)
         """
         loss = 0
-        loss_information = []
+        #loss_information = []
         for out,label in zip(outs,labels.t()):
             # out: Torch_size(batch,33)
             # label: Torch_size(batch)
             criterion_loss = self.criterion(out, label)
             loss += criterion_loss
-            loss_information.append(criterion_loss.data.item())
-        return loss,loss_information
+            #loss_information.append(criterion_loss.data.item())
+        return loss#,loss_information

@@ -23,25 +23,28 @@ class Dataset(data.Dataset):
         dataset_root: the images dir path
         dataset_list: the labels
     """
-    def __init__(self, dataset_root, dataset_list, class_name, data_type="train"):
+    def __init__(self, dataset_root, dataset_list, class_name, strategy, data_type="train"):
         self.class_name = class_name
         self.class_num = len(class_name)
+        self.strategy = strategy
 
         with open(dataset_list,"r") as file:
             datas = file.readlines()
 
         data = [os.path.join(dataset_root, data_.rstrip("\n")) for data_ in datas]
 
-        self.data = np.random.permutation(data)
+        
         if data_type == "train":
+            self.data = np.random.permutation(data)
             self.transforms = transforms.Compose([
-                transforms.RandomHorizontalFlip(),
-                transforms.CenterCrop(196),
+                # transforms.RandomHorizontalFlip(),
+                # transforms.CenterCrop(196),
                 transforms.Resize((224,224)),
                 transforms.ToTensor(),
                 transforms.Normalize((0.5,0.5,0.5),(0.5,0.5,0.5))
             ])
         elif data_type == "test":
+            self.data = data
             self.transforms = transforms.Compose([
                 transforms.Resize((224,224)),
                 transforms.ToTensor(),
@@ -67,7 +70,10 @@ class Dataset(data.Dataset):
         )
         attribute_label = [int(x) for x in splits[6:]]
 
-        label = self.label_convert(class_label,attribute_label)
+        if self.strategy == "A":
+            label = self.label_convert(class_label,attribute_label)
+        elif self.strategy == "B":
+            label = np.array(attribute_label).astype(np.float32)
 
         return data.float(), label
     
@@ -81,4 +87,4 @@ class Dataset(data.Dataset):
                 label.append(class_label)
             elif attribute == 0:
                 label.append(self.class_num)
-        return np.array(label)
+        return np.array(label).astype(np.long)
