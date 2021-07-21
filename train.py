@@ -150,8 +150,6 @@ def parse_args():
         help='The model configuration file.')
     parser.add_argument('--gpu-device', type=str, default="0,1,2",
                         help='GPU device')
-    # parser.add_argument('--LOG_txt', type=str, default="train.log",
-    #                     help='log')
     args = parser.parse_args()
 
     return args
